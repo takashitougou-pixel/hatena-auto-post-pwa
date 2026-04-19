@@ -155,6 +155,51 @@
       text-align: center;
       padding: 6px 20px 0;
     }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: white;
+      border-radius: 14px;
+      width: 100%;
+      max-width: 480px;
+      padding: 20px;
+    }
+    .modal-box h2 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+    .modal-box p { font-size: 13px; color: #6c6c70; margin-bottom: 10px; }
+    .modal-textarea {
+      width: 100%;
+      height: 160px;
+      font-size: 13px;
+      font-family: inherit;
+      border: 1px solid #d1d1d6;
+      border-radius: 8px;
+      padding: 10px;
+      resize: none;
+      color: #1c1c1e;
+    }
+    .modal-close {
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+      padding: 12px;
+      background: #007aff;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -169,7 +214,7 @@
   <div class="grid-2">
     <div class="row">
       <label>平均体重</label>
-      <input type="number" id="weight" placeholder="67.3" step="0.1" inputmode="decimal">
+      <input type="text" id="weight" placeholder="67.3" inputmode="decimal">
       <span class="unit">kg</span>
     </div>
     <div class="row">
@@ -179,7 +224,7 @@
     </div>
     <div class="row">
       <label>体脂肪率</label>
-      <input type="number" id="body_fat" placeholder="13.7" step="0.1" inputmode="decimal">
+      <input type="text" id="body_fat" placeholder="13.7" inputmode="decimal">
       <span class="unit">%</span>
     </div>
     <div class="row">
@@ -189,7 +234,7 @@
     </div>
     <div class="row">
       <label>骨格筋量</label>
-      <input type="number" id="muscle" placeholder="28.5" step="0.1" inputmode="decimal">
+      <input type="text" id="muscle" placeholder="28.5" inputmode="decimal">
       <span class="unit">kg</span>
     </div>
     <div class="row">
@@ -203,6 +248,15 @@
 <p class="section-label">今週のコメント</p>
 <div class="card">
   <textarea id="comment" placeholder="今週の出来事やコメントを入力..." rows="4"></textarea>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <h2>全文を選択してコピー</h2>
+    <p>自動コピーに失敗しました。下のテキストを長押し→「すべてを選択」→「コピー」してください。</p>
+    <textarea class="modal-textarea" id="modalText" readonly></textarea>
+    <button class="modal-close" onclick="document.getElementById('modalOverlay').classList.remove('open')">閉じる</button>
+  </div>
 </div>
 
 <button class="btn-copy" id="copyBtn" onclick="copyToClipboard()">
@@ -236,13 +290,18 @@
   }
 
   // ── テンプレート生成 ──────────────────────
+  function val(id) {
+    const el = document.getElementById(id);
+    return el.value || el.placeholder;
+  }
+
   function getBody() {
-    const w  = document.getElementById('weight').value;
-    const wd = document.getElementById('weight_diff').value;
-    const f  = document.getElementById('body_fat').value;
-    const fd = document.getElementById('fat_diff').value;
-    const m  = document.getElementById('muscle').value;
-    const md = document.getElementById('muscle_diff').value;
+    const w  = val('weight');
+    const wd = val('weight_diff');
+    const f  = val('body_fat');
+    const fd = val('fat_diff');
+    const m  = val('muscle');
+    const md = val('muscle_diff');
     const c  = document.getElementById('comment').value;
 
     return [
@@ -287,13 +346,29 @@
   function fallbackCopy(text, cb) {
     const ta = document.createElement('textarea');
     ta.value = text;
-    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;width:1px;height:1px';
     document.body.appendChild(ta);
     ta.focus();
-    ta.select();
-    try { document.execCommand('copy'); cb(); }
-    catch(e) { alert('コピーできませんでした。プレビューを長押しして手動でコピーしてください。'); }
+    ta.setSelectionRange(0, ta.value.length); // iOS対応
+    let success = false;
+    try { success = document.execCommand('copy'); } catch(e) {}
     document.body.removeChild(ta);
+    if (success) {
+      cb();
+    } else {
+      showManualCopyModal(text);
+    }
+  }
+
+  function showManualCopyModal(text) {
+    document.getElementById('modalText').value = text;
+    document.getElementById('modalOverlay').classList.add('open');
+    setTimeout(() => {
+      const ta = document.getElementById('modalText');
+      ta.focus();
+      ta.setSelectionRange(0, ta.value.length);
+    }, 100);
   }
 
   // ── localStorage 自動保存・復元 ──────────
